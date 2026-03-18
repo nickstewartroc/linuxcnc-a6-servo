@@ -1,0 +1,5 @@
+*.var
+*.preferences
+*.c
+*.halscope
+*.bak

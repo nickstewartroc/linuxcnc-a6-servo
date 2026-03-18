@@ -228,13 +228,15 @@ FUNCTION(read_all) {
 
   if (opmode_cyclic_position || opmode_cyclic_velocity) {
     stat_target_reached = (statusword >> 10) & 1;
-  } else {
-    stat_target_reached = 0;
-  }
+    } else {
+      stat_target_reached = 0;
+    }
 
   //home states  
   if (opmode_homing) {
-    stat_homed    = ((statusword >> 10) & 1) && ((statusword >> 12) & 1);
+	if (((statusword >> 10) & 1) && ((statusword >> 12) & 1))
+		if (!--stat_homed_delay)
+			stat_homed    = 1;
     stat_homing   = !stat_homed && !((statusword >> 10) & 1);
   }
 
@@ -249,7 +251,6 @@ FUNCTION(read_all) {
 
 FUNCTION(write_all) {
   int enable_edge;
-  static unsigned int last_controlword=0xffff;
 
   //init opmode
   if (!init_pos_mode) {
@@ -273,7 +274,7 @@ FUNCTION(write_all) {
       controlword |= (1 << 7); // fault reset
     }
   } else {
-    if (enable && !home) {
+    if (enable) {
       controlword |= (1 << 1); // enable voltage
       if (stat_switchon_ready) {
         controlword |= (1 << 0); // switch on
@@ -304,29 +305,12 @@ FUNCTION(write_all) {
   if (stat_voltage_enabled && !pos_mode && !home) {
     opmode = OPMODE_CYCLIC_VELOCITY;
   }
-  
   // mode Home and start homing
   if (home) {
-    if (enable) {
-      controlword |= (1 << 1); // enable voltage
-      if (stat_switchon_ready) {
-        opmode = OPMODE_HOMING;
-      }
-    }
-	
-    if (opmode_homing) {
-      controlword |= (1 << 0); // switch on
-      if (stat_switched_on) {
-        controlword |= (1 << 3); // enable op
-        if (stat_op_enabled) {
-          controlword |= (1 << 4); // homing enabled
-        }
-      }
-    }
+    opmode = OPMODE_HOMING;
+	// flip bit 4 after opmode change is confirmed
+	if (opmode_homing)
+      controlword |= (home << 4);
   }
-
-  //if (controlword != last_controlword) {
-  //  rtapi_print("write_all: controlword=%x\n", controlword);
-  //}
-  last_controlword = controlword;
 }
+
